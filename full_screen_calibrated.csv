@@ -1,0 +1,55 @@
+complex_id,target,mutation,ligand,predicted_ddG,phenotype
+ABL1_WT_axitinib,ABL1,WT,axitinib,0.0,Reference (WT)
+ABL1_WT_bosutinib,ABL1,WT,bosutinib,0.0,Reference (WT)
+ABL1_WT_dasatinib,ABL1,WT,dasatinib,0.0,Reference (WT)
+ABL1_WT_imatinib,ABL1,WT,imatinib,0.0,Reference (WT)
+ABL1_WT_nilotinib,ABL1,WT,nilotinib,0.0,Reference (WT)
+ABL1_WT_ponatinib,ABL1,WT,ponatinib,0.0,Reference (WT)
+ABL1_M244V_bosutinib,ABL1,M244V,bosutinib,0.134,Neutral
+ABL1_M244V_imatinib,ABL1,M244V,imatinib,0.33,Neutral
+ABL1_M244V_nilotinib,ABL1,M244V,nilotinib,0.728,Neutral
+ABL1_M244V_ponatinib,ABL1,M244V,ponatinib,-0.019,Neutral
+ABL1_G250E_bosutinib,ABL1,G250E,bosutinib,2.904,Resistant
+ABL1_G250E_imatinib,ABL1,G250E,imatinib,2.037,Resistant
+ABL1_G250E_nilotinib,ABL1,G250E,nilotinib,0.125,Neutral
+ABL1_G250E_ponatinib,ABL1,G250E,ponatinib,-0.954,Sensitive
+ABL1_Q252H_bosutinib,ABL1,Q252H,bosutinib,0.155,Neutral
+ABL1_Q252H_imatinib,ABL1,Q252H,imatinib,1.64,Resistant
+ABL1_Q252H_nilotinib,ABL1,Q252H,nilotinib,0.98,Neutral
+ABL1_Q252H_ponatinib,ABL1,Q252H,ponatinib,0.49,Neutral
+ABL1_Y253F_bosutinib,ABL1,Y253F,bosutinib,1.339,Resistant
+ABL1_Y253F_imatinib,ABL1,Y253F,imatinib,1.414,Resistant
+ABL1_Y253F_nilotinib,ABL1,Y253F,nilotinib,0.971,Neutral
+ABL1_Y253F_ponatinib,ABL1,Y253F,ponatinib,-0.478,Sensitive
+ABL1_E255K_bosutinib,ABL1,E255K,bosutinib,0.688,Neutral
+ABL1_E255K_imatinib,ABL1,E255K,imatinib,1.24,Resistant
+ABL1_E255K_nilotinib,ABL1,E255K,nilotinib,0.691,Neutral
+ABL1_E255K_ponatinib,ABL1,E255K,ponatinib,-0.054,Neutral
+ABL1_T315I_bosutinib,ABL1,T315I,bosutinib,3.673,Resistant
+ABL1_T315I_imatinib,ABL1,T315I,imatinib,3.7,Resistant
+ABL1_T315I_nilotinib,ABL1,T315I,nilotinib,3.261,Resistant
+ABL1_T315I_ponatinib,ABL1,T315I,ponatinib,1.232,Resistant
+ABL1_F317L_bosutinib,ABL1,F317L,bosutinib,0.156,Neutral
+ABL1_F317L_imatinib,ABL1,F317L,imatinib,0.971,Neutral
+ABL1_F317L_nilotinib,ABL1,F317L,nilotinib,-1.284,Sensitive
+ABL1_F317L_ponatinib,ABL1,F317L,ponatinib,0.72,Neutral
+ABL1_M351T_bosutinib,ABL1,M351T,bosutinib,0.695,Neutral
+ABL1_M351T_imatinib,ABL1,M351T,imatinib,0.219,Neutral
+ABL1_M351T_nilotinib,ABL1,M351T,nilotinib,-1.524,Sensitive
+ABL1_M351T_ponatinib,ABL1,M351T,ponatinib,-0.509,Sensitive
+ABL1_F359V_bosutinib,ABL1,F359V,bosutinib,-0.082,Neutral
+ABL1_F359V_imatinib,ABL1,F359V,imatinib,0.787,Neutral
+ABL1_F359V_nilotinib,ABL1,F359V,nilotinib,0.969,Neutral
+ABL1_F359V_ponatinib,ABL1,F359V,ponatinib,-1.166,Sensitive
+ABL1_H396R_bosutinib,ABL1,H396R,bosutinib,1.196,Neutral
+ABL1_H396R_imatinib,ABL1,H396R,imatinib,0.88,Neutral
+ABL1_H396R_nilotinib,ABL1,H396R,nilotinib,0.851,Neutral
+ABL1_H396R_ponatinib,ABL1,H396R,ponatinib,-0.278,Neutral
+EGFR_WT_gefitinib,EGFR,WT,gefitinib,0.0,Reference (WT)
+EGFR_WT_osimertinib,EGFR,WT,osimertinib,0.0,Reference (WT)
+EGFR_T790M_gefitinib,EGFR,T790M,gefitinib,1.955,Resistant
+EGFR_T790M_osimertinib,EGFR,T790M,osimertinib,0.321,Neutral
+EGFR_L858R_gefitinib,EGFR,L858R,gefitinib,-0.286,Neutral
+EGFR_L858R_osimertinib,EGFR,L858R,osimertinib,-0.765,Sensitive
+EGFR_C797S_gefitinib,EGFR,C797S,gefitinib,1.181,Neutral
+EGFR_C797S_osimertinib,EGFR,C797S,osimertinib,2.327,Resistant
