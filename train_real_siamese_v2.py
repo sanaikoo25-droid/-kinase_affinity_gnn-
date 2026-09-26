@@ -6,8 +6,10 @@ import pandas as pd
 import numpy as np
 from torch_geometric.nn import MessagePassing
 from scipy.stats import pearsonr, spearmanr
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.model_selection import KFold
 
+# Experimental ΔΔG benchmark pairs
 exp_ddg_table = {
     ("ABL1", "M244V", "axitinib"): -0.11,
     ("ABL1", "M244V", "bosutinib"): 0.43,
@@ -34,8 +36,8 @@ exp_ddg_table = {
 manifest = pd.read_csv("graph_manifest.csv")
 
 def find_wt_graph(target, ligand_smiles):
-    matches = manifest[(manifest["target"] == target) & 
-                       (manifest["mutation"] == "WT") & 
+    matches = manifest[(manifest["target"] == target) &
+                       (manifest["mutation"] == "WT") &
                        (manifest["ligand_smiles"] == ligand_smiles)]
     if not matches.empty:
         return matches.iloc[0]["graph_path"]
@@ -72,7 +74,6 @@ class DistanceAwareEncoder(nn.Module):
         h = F.silu(self.conv1(data.x, data.edge_index, data.pos))
         h = F.silu(self.conv2(h, data.edge_index, data.pos))
         h = self.node_proj(h)
-        # Sum pooling preserves total pocket contact energy better than mean pooling
         return torch.sum(h, dim=0, keepdim=True)
 
 class SiameseResidualV2(nn.Module):
@@ -88,16 +89,14 @@ class SiameseResidualV2(nn.Module):
     def forward(self, wt_g, mut_g):
         h_wt = self.encoder(wt_g)
         h_mut = self.encoder(mut_g)
-        # Antisymmetric delta representation
         delta_h = h_mut - h_wt
         return self.head(delta_h)
 
-# Compile training pairs
-training_pairs = []
-y_all = []
+# Compile dataset pairs
+dataset = []
 for (target, mut, lig), ddg in exp_ddg_table.items():
-    mut_rows = manifest[(manifest["target"] == target) & 
-                        (manifest["mutation"] == mut) & 
+    mut_rows = manifest[(manifest["target"] == target) &
+                        (manifest["mutation"] == mut) &
                         (manifest["complex_id"].str.contains(lig, case=False, na=False))]
     if mut_rows.empty:
         continue
@@ -105,67 +104,110 @@ for (target, mut, lig), ddg in exp_ddg_table.items():
     wt_path = find_wt_graph(target, lig_smiles)
     mut_path = mut_rows.iloc[0]["graph_path"]
     if wt_path and os.path.exists(wt_path) and os.path.exists(mut_path):
-        training_pairs.append((wt_path, mut_path, ddg, (target, mut, lig)))
-        y_all.append(ddg)
-
-y_mean = np.mean(y_all)
-y_std = np.std(y_all) if np.std(y_all) > 1e-4 else 1.0
-
-model = SiameseResidualV2()
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-3)
-criterion = nn.SmoothL1Loss()
-
-print(f"Training Distance-Aware Siamese Network on {len(training_pairs)} pairs...")
-model.train()
-for epoch in range(1, 81):
-    total_loss = 0.0
-    for wt_p, mut_p, target_ddg, _ in training_pairs:
-        wt_g = torch.load(wt_p)
-        mut_g = torch.load(mut_p)
-        norm_target = torch.tensor([[(target_ddg - y_mean) / y_std]], dtype=torch.float)
-
-        optimizer.zero_grad()
-        pred = model(wt_g, mut_g)
-        loss = criterion(pred, norm_target)
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-
-    if epoch % 20 == 0:
-        print(f"Epoch {epoch:02d}/80 - Loss: {total_loss / len(training_pairs):.4f}")
-
-# Evaluation
-model.eval()
-records = []
-y_true, y_pred = [], []
-
-with torch.no_grad():
-    for wt_p, mut_p, target_val, meta in training_pairs:
-        wt_g = torch.load(wt_p)
-        mut_g = torch.load(mut_p)
-        raw_pred = model(wt_g, mut_g).item()
-        unnorm_pred = raw_pred * y_std + y_mean
-
-        y_true.append(target_val)
-        y_pred.append(unnorm_pred)
-        records.append({
-            "target": meta[0],
-            "mutation": meta[1],
-            "ligand": meta[2],
-            "exp_ddG": target_val,
-            "pred_ddG": round(unnorm_pred, 3)
+        dataset.append({
+            "wt_path": wt_path,
+            "mut_path": mut_path,
+            "ddg": ddg,
+            "target": target,
+            "mutation": mut,
+            "ligand": lig
         })
 
-res_df = pd.DataFrame(records)
-res_df.to_csv("real_structure_predictions_v2.csv", index=False)
+print(f"Loaded {len(dataset)} valid experimental pairs for cross-validation.")
 
-r, _ = pearsonr(y_true, y_pred)
-rho, _ = spearmanr(y_true, y_pred)
-rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+# 5-Fold Cross-Validation Setup
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+oof_predictions = []
 
-print("\n=== DISTANCE-AWARE 3D GNN EVALUATION ===")
-print(f"Pearson Correlation (R): {r:.3f}")
-print(f"Spearman Rank (rho)    : {rho:.3f}")
-print(f"RMSE                   : {rmse:.3f} kcal/mol")
-print("\nPredictions:")
-print(res_df.to_string(index=False))
+print("\nStarting 5-Fold Cross-Validation (Held-out Out-of-Fold Evaluation)...")
+
+for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)):
+    train_data = [dataset[i] for i in train_idx]
+    val_data = [dataset[i] for i in val_idx]
+
+    train_ddgs = [d["ddg"] for d in train_data]
+    y_mean = np.mean(train_ddgs)
+    y_std = np.std(train_ddgs) if np.std(train_ddgs) > 1e-4 else 1.0
+
+    fold_model = SiameseResidualV2()
+    optimizer = torch.optim.AdamW(fold_model.parameters(), lr=0.001, weight_decay=1e-3)
+    criterion = nn.SmoothL1Loss()
+
+    # Train strictly on the training fold
+    fold_model.train()
+    for epoch in range(1, 81):
+        for item in train_data:
+            wt_g = torch.load(item["wt_path"])
+            mut_g = torch.load(item["mut_path"])
+            norm_target = torch.tensor([[(item["ddg"] - y_mean) / y_std]], dtype=torch.float)
+
+            optimizer.zero_grad()
+            pred = fold_model(wt_g, mut_g)
+            loss = criterion(pred, norm_target)
+            loss.backward()
+            optimizer.step()
+
+    # Evaluate strictly on unseen held-out validation fold
+    fold_model.eval()
+    with torch.no_grad():
+        for item in val_data:
+            wt_g = torch.load(item["wt_path"])
+            mut_g = torch.load(item["mut_path"])
+            raw_pred = fold_model(wt_g, mut_g).item()
+            unnorm_pred = raw_pred * y_std + y_mean
+
+            oof_predictions.append({
+                "fold": fold + 1,
+                "target": item["target"],
+                "mutation": item["mutation"],
+                "ligand": item["ligand"],
+                "exp_ddG": item["ddg"],
+                "pred_ddG": float(unnorm_pred)
+            })
+
+oof_df = pd.DataFrame(oof_predictions)
+oof_df.to_csv("cross_validation_results.csv", index=False)
+
+# Calculate genuine out-of-fold generalization metrics
+y_true = oof_df["exp_ddG"].values
+y_pred = oof_df["pred_ddG"].values
+
+r_cv, _ = pearsonr(y_true, y_pred)
+rho_cv, _ = spearmanr(y_true, y_pred)
+rmse_cv = np.sqrt(mean_squared_error(y_true, y_pred))
+mae_cv = mean_absolute_error(y_true, y_pred)
+
+print("\n=======================================================")
+print("=== HELD-OUT 5-FOLD CROSS-VALIDATION RESULTS ===")
+print("=======================================================")
+print(f"Test Pearson Correlation (R) : {r_cv:.3f}")
+print(f"Test Spearman Rank (rho)     : {rho_cv:.3f}")
+print(f"Test RMSE                    : {rmse_cv:.3f} kcal/mol")
+print(f"Test MAE                     : {mae_cv:.3f} kcal/mol")
+print("=======================================================\n")
+
+# Train production model on 100% of data for the full panel screen
+print("Training final production weights on full dataset...")
+all_ddgs = [d["ddg"] for d in dataset]
+full_y_mean = np.mean(all_ddgs)
+full_y_std = np.std(all_ddgs) if np.std(all_ddgs) > 1e-4 else 1.0
+
+prod_model = SiameseResidualV2()
+prod_opt = torch.optim.AdamW(prod_model.parameters(), lr=0.001, weight_decay=1e-3)
+criterion = nn.SmoothL1Loss()
+
+prod_model.train()
+for epoch in range(1, 81):
+    for item in dataset:
+        wt_g = torch.load(item["wt_path"])
+        mut_g = torch.load(item["mut_path"])
+        norm_t = torch.tensor([[(item["ddg"] - full_y_mean) / full_y_std]], dtype=torch.float)
+
+        prod_opt.zero_grad()
+        pred = prod_model(wt_g, mut_g)
+        loss = criterion(pred, norm_t)
+        loss.backward()
+        prod_opt.step()
+
+torch.save(prod_model.state_dict(), "siamese_production_model.pt")
+print("Saved siamese_production_model.pt and cross_validation_results.csv successfully.")
