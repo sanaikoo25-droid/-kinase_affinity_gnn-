@@ -18,4 +18,6 @@ cd kinase_affinity_gnn
 # Run calibrated screening
 python screen_all_complexes_v2.py
 
-doi = doi.org/10.26434/chemrxiv.15009874/v1
+doi = {https://doi.org/10.26434/chemrxiv.15009874/v1}
+
+}
